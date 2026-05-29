@@ -306,7 +306,7 @@ the script's path under this skill directory.
     "project": "<linear project>", "project_url": "<linear project URL>",
     "milestone": "<linear milestone or initiative>", "milestone_url": "<linear milestone URL>",
     "author": "<github login>",
-    "avatar_url": "<gravatar URL — MD5(author email) per the standard gravatar pattern. find_authors.py emits these pre-computed; without one, the slot renders as a plain colored circle (no broken images).>",
+    "avatar_url": "<optional. Gravatar URL — MD5(author email) per the standard gravatar pattern; find_authors.py emits these pre-computed. If omitted, the renderer resolves an avatar automatically: first from any other entry that names the same person, then by deriving github.com/<author>.png when `author` is a GitHub handle. Only a non-handle author with no match falls back to a plain colored circle (no broken images).>",
     "title": "<PR title or first line of commit message — the GitHub-style commit subject>",
     "date": "YYYY-MM-DD"
   },
@@ -339,7 +339,7 @@ the script's path under this skill directory.
       "ticket":"ABC-123","ticket_url":"...",
       "title":"PR title or commit subject",
       "kind":"change | addition | removal",
-      "author":"<github login>","avatar_url":"<optional>",
+      "author":"<github login>","avatar_url":"<optional — auto-resolved from the login when omitted; see the origin.avatar_url note>",
       "date":"YYYY-MM-DD",
       "snippet":"def attach_error\n  …\nend",
       "snippet_lang":"ruby",
@@ -353,7 +353,7 @@ the script's path under this skill directory.
       "kind":"pr-review | slack | chat | linear | jira | ticket | documentation | rfc | notion",
       "url":"<link to the source: PR review URL, Slack permalink, ticket URL, etc.>",
       "author":"<name or handle of the person whose words this is, when known>",
-      "avatar_url":"<gravatar URL, optional>",
+      "avatar_url":"<optional — auto-resolved from the author handle when omitted; see the origin.avatar_url note>",
       "title":"<short heading: 'aitchiss review on PR #19626', '#pod-sre design discussion', 'SUP-147 ticket intent', etc.>",
       "quote":"<verbatim quote from the source — markdown allowed (use backticks for code, bold for emphasis)>",
       "body":"<optional additional context/markdown — typically the follow-up or the resolution>"
