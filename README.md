@@ -166,6 +166,19 @@ the rendered content (code blocks, timeline, cards) works without any network at
 
 ## Customization
 
+### Built-in themes
+
+The report ships with two themes, selectable from the **theme button in the top-right** of
+every report. Selection is persisted per browser via `localStorage`, so reports you open
+later remember the choice.
+
+- **Default** — adapts to OS preference (light by day, GitHub-style dark by night).
+- **Terminal** — a Charm-inspired dark theme: deep near-black with a slight violet cast,
+  hot-pink primary accent, cyan / lime / amber semantic colors. Always dark regardless of
+  OS preference.
+
+### Theming via CSS variables
+
 The HTML report's appearance is themeable through CSS variables. The `:root` block at the
 top of `skills/why/assets/report_template.html` defines:
 
@@ -177,7 +190,13 @@ top of `skills/why/assets/report_template.html` defines:
 - Component sizes — `--avatar-size`, `--dot-size`, `--oc-size`.
 - History-track layout — `--history-bar-width`, `--history-mini-width`, etc.
 
-To rebrand, override just the `:root` block; no component CSS should need to change.
+To rebrand, override just the `:root` block; no component CSS should need to change. The
+**built-in Terminal theme lives under `:root[data-theme="terminal"]`** (attribute selectors
+beat plain `:root` for specificity), so:
+
+- Overriding `:root` re-themes the Default theme.
+- Overriding `:root[data-theme="terminal"]` re-themes Terminal.
+- To override *both* at once, use the combined selector `:root, :root[data-theme="terminal"]`.
 
 ---
 

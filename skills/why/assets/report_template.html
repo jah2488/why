@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+<script>
+  /* Apply the saved theme before the stylesheet parses, so first paint is correct
+     (no flash). The localStorage key persists across reports. */
+  (function(){
+    try {
+      var t = localStorage.getItem('why-theme');
+      if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t);
+    } catch(e) {}
+  })();
+</script>
 <style>
   /* --------------------------------------------------------------------------------
      Theme tokens. Everything visual reads from these — switching themes means
@@ -53,6 +63,75 @@
       --shadow-float:0 1px 3px rgba(0,0,0,.4);
     }
   }
+
+  /* --------------------------------------------------------------------------------
+     "Terminal" theme — Charm-leaning. Deep near-black with a slight violet cast,
+     hot-pink primary accent, cyan/lime semantic colors, **monospace for all chrome
+     metadata** (chips, dates, headers, ToC, action labels) while prose body stays
+     sans for readability. Triggered by setting <html data-theme="terminal">. The
+     attribute-selector specificity beats the plain `:root` and the OS-dark
+     `@media` block, so it always wins regardless of OS preference. To override
+     the Terminal theme via custom CSS, target `:root[data-theme="terminal"]`
+     specifically.
+     -------------------------------------------------------------------------------- */
+  :root[data-theme="terminal"]{
+    color-scheme:dark;
+    /* surfaces — slightly darker bg, more present borders */
+    --bg:#0C0D15; --fg:#EAEAEF; --muted:#8B8BA3; --border:#2D2D44; --subtle:#15161F;
+    --card:#181822;
+    /* accents — hotter pink */
+    --accent:#FF66B3; --accent-bg:#3A1A2E;
+    /* code */
+    --code-bg:#12131C; --code-border:#2D2D44;
+    /* alert / revert callout */
+    --alert-bg:#2A1F12; --alert-border:#FFAE6B; --alert-fg:#FFD6A0; --alert-icon:#FFAE6B;
+    /* semantic kinds — strip colors */
+    --c-origin:#B084EB; --c-change:#FF8A5E; --c-discussion:#7BD6F8; --c-context:#7C7C90;
+    --c-addition:#A0EE5B; --c-removal:#FF5454;
+    /* depth */
+    --shadow:0 1px 2px rgba(0,0,0,.7), 0 0 0 1px rgba(255,82,167,.06);
+    --shadow-float:0 2px 6px rgba(0,0,0,.8);
+    /* no radii — terminals don't have soft corners. The variables go to zero AND
+       we apply a universal override below to nuke any literal border-radius values
+       (e.g. avatars' 50%, the toast's pill, hardcoded card radii). */
+    --radius-sm:0; --radius-md:0; --radius-lg:0; --radius-pill:0;
+  }
+  :root[data-theme="terminal"] *,
+  :root[data-theme="terminal"] *::before,
+  :root[data-theme="terminal"] *::after{ border-radius:0 !important }
+
+  /* Terminal typography: monospace by default, sans only for prose bodies.
+     Charm's signature: chrome reads as code, prose reads as prose. */
+  :root[data-theme="terminal"] body{
+    font-family:"JetBrains Mono","Berkeley Mono","Cascadia Code",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+  }
+  :root[data-theme="terminal"] article,
+  :root[data-theme="terminal"] article p,
+  :root[data-theme="terminal"] article li,
+  :root[data-theme="terminal"] .changecard .why,
+  :root[data-theme="terminal"] .riskcard .risk-body,
+  :root[data-theme="terminal"] .changecard.discussioncard .discussion-quote,
+  :root[data-theme="terminal"] .revert-row .why{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif
+  }
+  /* Primary button: solid pink with near-black label — pops, doesn't feel generic. */
+  :root[data-theme="terminal"] button.primary{
+    color:var(--bg);font-weight:700;letter-spacing:.02em
+  }
+  /* Subtle terminal-style decorations: ❯ before panel headers + the active ToC entry,
+     pulled in via accent color so they read as "current cursor". */
+  :root[data-theme="terminal"] .panel h4 .head-left::before,
+  :root[data-theme="terminal"] details.panel.collapsible > summary .head-left::before,
+  :root[data-theme="terminal"] .revert-list h5::before{
+    content:"❯ ";color:var(--accent);font-weight:700
+  }
+  :root[data-theme="terminal"] nav#toc a.active::before{
+    content:"❯ ";color:var(--accent);font-weight:700;margin-left:-12px
+  }
+  /* Tighten the dropdown arrow color too in terminal mode (the SVG was muted-tinted). */
+  :root[data-theme="terminal"] .sidebar-actions select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23ff66b3' d='M3 4.5 6 8l3-3.5z'/></svg>")
+  }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--fg);
@@ -64,11 +143,29 @@
   .hd-inner h1{margin:0;font-size:18px;line-height:1.25}
   .subtitle{color:var(--muted);font-size:13px;margin-top:2px}
   .hd-inner .grow{flex:1}
-  .actions{display:flex;gap:8px}
   button{font:inherit;font-size:13.5px;cursor:pointer;padding:6px 12px;border-radius:8px;
          border:1px solid var(--border);background:var(--card);color:var(--fg)}
   button:hover{border-color:var(--accent)}
   button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* sidebar action stack — sits below the ToC, sticky with the sidebar */
+  .sidebar-actions{margin-top:var(--space-lg);padding-top:var(--space-md);
+                   border-top:1px solid var(--border);
+                   display:flex;flex-direction:column;gap:var(--space-sm)}
+  .sidebar-actions .actions-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+                              color:var(--muted);margin-bottom:var(--space-xs);font-weight:600}
+  .sidebar-actions .control{display:flex;align-items:center;gap:var(--space-sm);
+                            font-size:var(--font-sm);color:var(--muted)}
+  .sidebar-actions .control .ctl-label{flex-shrink:0}
+  .sidebar-actions select{flex:1;appearance:none;-webkit-appearance:none;
+                          background:var(--card);color:var(--fg);
+                          border:1px solid var(--border);border-radius:var(--radius-sm);
+                          padding:4px 24px 4px 8px;font:inherit;font-size:var(--font-sm);
+                          cursor:pointer;
+                          background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%238b8b70' d='M3 4.5 6 8l3-3.5z'/></svg>");
+                          background-repeat:no-repeat;background-position:right 6px center;background-size:10px}
+  .sidebar-actions select:hover,.sidebar-actions select:focus-visible{border-color:var(--accent);outline:none}
+  .sidebar-actions button{width:100%;text-align:left;padding:6px 10px}
 
   /* layout grid */
   .wrap{max-width:1240px;margin:0 auto;padding:24px 24px 96px;
@@ -395,9 +492,12 @@
   svg .bar{fill:var(--accent);opacity:.85}
   svg .bar:hover{opacity:1}
 
-  /* highlight.js GitHub theme (light = default, dark via media query) */
+  /* highlight.js GitHub theme — light by default; dark in OS-dark mode (via @media);
+     also dark whenever the Terminal theme is active (via CSS nesting under the
+     attribute selector — supported in Chrome 112+ / Safari 16.5+ / Firefox 117+). */
   __HLJS_LIGHT_CSS__
   @media (prefers-color-scheme: dark) { __HLJS_DARK_CSS__ }
+  :root[data-theme="terminal"] { __HLJS_DARK_CSS__ }
   .hljs{background:transparent !important;padding:0 !important}
 
   /* tooltip ? badge — built-in browser CSS only */
@@ -463,16 +563,24 @@
 <header class="page">
   <div class="hd-inner">
     <div class="grow"><h1 id="title">__TITLE__</h1><div class="subtitle" id="subtitle"></div></div>
-    <div class="actions">
-      <button class="primary" id="copyBtn">Copy markdown</button>
-      <button id="rawBtn">Raw</button>
-    </div>
   </div>
 </header>
 <div class="wrap">
   <aside class="sidebar">
     <div class="toc-h">On this page</div>
     <nav id="toc"></nav>
+    <div class="sidebar-actions">
+      <div class="actions-h">Actions</div>
+      <label class="control">
+        <span class="ctl-label">Theme</span>
+        <select id="themeSel" aria-label="Theme">
+          <option value="default">Default</option>
+          <option value="terminal">Terminal</option>
+        </select>
+      </label>
+      <button class="primary" id="copyBtn">Copy markdown</button>
+      <button id="rawBtn">Toggle raw</button>
+    </div>
   </aside>
   <main>
     <section id="glance" class="glance" hidden></section>
@@ -1252,6 +1360,20 @@ document.getElementById('copyBtn').addEventListener('click', async ()=>{
 });
 document.getElementById('rawBtn').addEventListener('click', ()=>{
   const w = document.getElementById('rawWrap'); w.open = !w.open; if (w.open) w.scrollIntoView({behavior:'smooth'});
+});
+
+/* ---------- theme selector ---------- */
+const themeSel = document.getElementById('themeSel');
+function getTheme(){
+  try { return localStorage.getItem('why-theme') || 'default'; } catch(e) { return 'default'; }
+}
+/* Sync the dropdown's value with the saved theme on load. */
+if (themeSel) themeSel.value = getTheme();
+themeSel && themeSel.addEventListener('change', () => {
+  const next = themeSel.value;
+  if (next === 'default') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('why-theme', next); } catch(e) {}
 });
 </script>
 </body>
