@@ -1,0 +1,8 @@
+{
+  "name": "why",
+  "version": "0.1.1",
+  "description": "Code archaeology: trace the full history and context behind a piece of code — what it does, who introduced it, which PR(s) changed it, and the surrounding discussion in PR reviews and Slack. Produces a self-contained HTML report.",
+  "author": {
+    "name": "jah2488"
+  }
+}

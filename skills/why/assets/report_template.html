@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<script>
+  /* Apply the saved theme before the stylesheet parses, so first paint is correct
+     (no flash). The localStorage key persists across reports. */
+  (function(){
+    try {
+      var t = localStorage.getItem('why-theme');
+      if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t);
+    } catch(e) {}
+  })();
+</script>
+<style>
+  /* --------------------------------------------------------------------------------
+     Theme tokens. Everything visual reads from these — switching themes means
+     overriding this block (and the dark @media block below). Do not put hard-coded
+     colors / sizes / radii in component CSS; reach for a token or add one here.
+     -------------------------------------------------------------------------------- */
+  :root{
+    /* colors */
+    --bg:#fbfbfa; --fg:#1d1d1f; --muted:#6b6b70; --border:#e6e6e3; --subtle:#f3f3f1;
+    --card:#ffffff; --accent:#2962ff; --accent-bg:#eaf0ff;
+    --code-bg:#ececea; --code-border:#dcdcd8;
+    --alert-bg:#fff8e1; --alert-border:#f3b85c; --alert-fg:#5b3e00; --alert-icon:#c08116;
+    --c-origin:#2962ff; --c-change:#d6470a; --c-discussion:#2ca02c; --c-context:#8a8a8e;
+    --c-addition:#2ca02c; --c-removal:#d6470a;
+    --shadow:0 1px 2px rgba(0,0,0,.04), 0 0 0 1px rgba(0,0,0,.04);
+    --shadow-float:0 1px 3px rgba(0,0,0,.06);
+
+    /* spacing scale */
+    --space-xs:4px; --space-sm:8px; --space-md:12px; --space-lg:18px; --space-xl:24px;
+
+    /* typography scale */
+    --font-xs:11px; --font-sm:12.5px; --font-md:14px; --font-lg:15.5px; --font-xl:18px;
+
+    /* radii */
+    --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-pill:999px;
+
+    /* component sizes */
+    --avatar-size:28px;
+    --dot-size:14px;
+    --oc-size:14px;
+
+    /* history-track layout — the vertical "line" sits at the horizontal center of the track,
+       hidden behind the cards via solid backgrounds, only visible in the inter-entry gaps. */
+    --history-bar-width:2px;
+    --history-mini-width:75%;       /* event mini-cards are 75% of the track width */
+    --history-date-min-width:96px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#161618; --fg:#e7e7e7; --muted:#9a9aa0; --border:#2c2c30; --subtle:#1f1f22;
+      --card:#212124; --accent:#6d9bff; --accent-bg:#1a2849;
+      --code-bg:#2b2b30; --code-border:#3a3a3f;
+      --alert-bg:#3a2c0a; --alert-border:#a06b0a; --alert-fg:#f4d27a; --alert-icon:#e8a850;
+      --c-origin:#6d9bff; --c-change:#f28b82; --c-discussion:#5bb974; --c-context:#9a9aa0;
+      --c-addition:#5bb974; --c-removal:#f28b82;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04);
+      --shadow-float:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+
+  /* --------------------------------------------------------------------------------
+     "Terminal" theme — Charm-leaning. Deep near-black with a slight violet cast,
+     hot-pink primary accent, cyan/lime semantic colors, **monospace for all chrome
+     metadata** (chips, dates, headers, ToC, action labels) while prose body stays
+     sans for readability. Triggered by setting <html data-theme="terminal">. The
+     attribute-selector specificity beats the plain `:root` and the OS-dark
+     `@media` block, so it always wins regardless of OS preference. To override
+     the Terminal theme via custom CSS, target `:root[data-theme="terminal"]`
+     specifically.
+     -------------------------------------------------------------------------------- */
+  :root[data-theme="terminal"]{
+    color-scheme:dark;
+    /* surfaces — slightly darker bg, more present borders */
+    --bg:#0C0D15; --fg:#EAEAEF; --muted:#8B8BA3; --border:#2D2D44; --subtle:#15161F;
+    --card:#181822;
+    /* accents — hotter pink */
+    --accent:#FF66B3; --accent-bg:#3A1A2E;
+    /* code */
+    --code-bg:#12131C; --code-border:#2D2D44;
+    /* alert / revert callout */
+    --alert-bg:#2A1F12; --alert-border:#FFAE6B; --alert-fg:#FFD6A0; --alert-icon:#FFAE6B;
+    /* semantic kinds — strip colors */
+    --c-origin:#B084EB; --c-change:#FF8A5E; --c-discussion:#7BD6F8; --c-context:#7C7C90;
+    --c-addition:#A0EE5B; --c-removal:#FF5454;
+    /* depth */
+    --shadow:0 1px 2px rgba(0,0,0,.7), 0 0 0 1px rgba(255,82,167,.06);
+    --shadow-float:0 2px 6px rgba(0,0,0,.8);
+    /* no radii — terminals don't have soft corners. The variables go to zero AND
+       we apply a universal override below to nuke any literal border-radius values
+       (e.g. avatars' 50%, the toast's pill, hardcoded card radii). */
+    --radius-sm:0; --radius-md:0; --radius-lg:0; --radius-pill:0;
+  }
+  :root[data-theme="terminal"] *,
+  :root[data-theme="terminal"] *::before,
+  :root[data-theme="terminal"] *::after{ border-radius:0 !important }
+
+  /* Terminal typography: monospace by default, sans only for prose bodies.
+     Charm's signature: chrome reads as code, prose reads as prose. */
+  :root[data-theme="terminal"] body{
+    font-family:"JetBrains Mono","Berkeley Mono","Cascadia Code",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+  }
+  :root[data-theme="terminal"] article,
+  :root[data-theme="terminal"] article p,
+  :root[data-theme="terminal"] article li,
+  :root[data-theme="terminal"] .changecard .why,
+  :root[data-theme="terminal"] .riskcard .risk-body,
+  :root[data-theme="terminal"] .changecard.discussioncard .discussion-quote,
+  :root[data-theme="terminal"] .revert-row .why{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif
+  }
+  /* Primary button: solid pink with near-black label — pops, doesn't feel generic. */
+  :root[data-theme="terminal"] button.primary{
+    color:var(--bg);font-weight:700;letter-spacing:.02em
+  }
+  /* Subtle terminal-style decorations: ❯ before panel headers + the active ToC entry,
+     pulled in via accent color so they read as "current cursor". */
+  :root[data-theme="terminal"] .panel h4 .head-left::before,
+  :root[data-theme="terminal"] details.panel.collapsible > summary .head-left::before,
+  :root[data-theme="terminal"] .revert-list h5::before{
+    content:"❯ ";color:var(--accent);font-weight:700
+  }
+  :root[data-theme="terminal"] nav#toc a.active::before{
+    content:"❯ ";color:var(--accent);font-weight:700;margin-left:-12px
+  }
+  /* Tighten the dropdown arrow color too in terminal mode (the SVG was muted-tinted). */
+  :root[data-theme="terminal"] .sidebar-actions select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%23ff66b3' d='M3 4.5 6 8l3-3.5z'/></svg>")
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+
+  /* page header */
+  header.page{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
+  .hd-inner{max-width:1240px;margin:0 auto;padding:14px 24px;display:flex;align-items:flex-start;gap:16px}
+  .hd-inner h1{margin:0;font-size:18px;line-height:1.25}
+  .subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+  .hd-inner .grow{flex:1}
+  button{font:inherit;font-size:13.5px;cursor:pointer;padding:6px 12px;border-radius:8px;
+         border:1px solid var(--border);background:var(--card);color:var(--fg)}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* sidebar action stack — sits below the ToC, sticky with the sidebar */
+  .sidebar-actions{margin-top:var(--space-lg);padding-top:var(--space-md);
+                   border-top:1px solid var(--border);
+                   display:flex;flex-direction:column;gap:var(--space-sm)}
+  .sidebar-actions .actions-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+                              color:var(--muted);margin-bottom:var(--space-xs);font-weight:600}
+  .sidebar-actions .control{display:flex;align-items:center;gap:var(--space-sm);
+                            font-size:var(--font-sm);color:var(--muted)}
+  .sidebar-actions .control .ctl-label{flex-shrink:0}
+  .sidebar-actions select{flex:1;appearance:none;-webkit-appearance:none;
+                          background:var(--card);color:var(--fg);
+                          border:1px solid var(--border);border-radius:var(--radius-sm);
+                          padding:4px 24px 4px 8px;font:inherit;font-size:var(--font-sm);
+                          cursor:pointer;
+                          background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%238b8b70' d='M3 4.5 6 8l3-3.5z'/></svg>");
+                          background-repeat:no-repeat;background-position:right 6px center;background-size:10px}
+  .sidebar-actions select:hover,.sidebar-actions select:focus-visible{border-color:var(--accent);outline:none}
+  .sidebar-actions button{width:100%;text-align:left;padding:6px 10px}
+
+  /* layout grid */
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 24px 96px;
+        display:grid;grid-template-columns:220px minmax(0,1fr);gap:36px}
+  @media (max-width:900px){.wrap{grid-template-columns:1fr;gap:18px;padding:18px}}
+  aside.sidebar{align-self:start;position:sticky;top:72px;font-size:13.5px}
+  @media (max-width:900px){aside.sidebar{position:static}}
+  .toc-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px}
+  nav#toc{display:block;border-left:1px solid var(--border);padding-left:14px}
+  nav#toc a{display:block;color:var(--muted);text-decoration:none;padding:3px 0;line-height:1.35}
+  nav#toc a.h3{padding-left:14px;font-size:12.5px}
+  nav#toc a:hover{color:var(--fg)}
+  nav#toc a.active{color:var(--accent);font-weight:600}
+  main{min-width:0}
+
+  /* at-a-glance card */
+  .glance{background:var(--card);border:1px solid var(--border);border-radius:14px;
+          box-shadow:var(--shadow);padding:18px 20px;margin-bottom:24px}
+
+  /* octicon */
+  .oc{width:14px;height:14px;flex-shrink:0;vertical-align:-2px;fill:currentColor}
+  .oc.sm{width:12px;height:12px}
+
+  /* GitHub-style commit header */
+  .commit-head{display:flex;align-items:flex-start;gap:12px;padding:2px 0}
+  .commit-head-left{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;width:28px}
+  img.avatar{width:28px;height:28px;border-radius:50%;display:block;background:var(--subtle);object-fit:cover;flex-shrink:0}
+  .avatar-empty{display:inline-block;width:28px;height:28px;border-radius:50%;background:var(--subtle);flex-shrink:0}
+  .icon-refs{display:inline-flex;align-items:center;gap:4px}
+  .icon-refs a{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+               color:var(--accent);text-decoration:none;border-radius:4px}
+  .icon-refs a:hover{background:var(--accent-bg)}
+  .icon-refs a .oc{width:14px;height:14px}
+  .commit-head .body{flex:1;min-width:0}
+  .commit-head .top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:14px;line-height:1.4}
+  .commit-head .author{font-weight:600;color:var(--fg)}
+  .commit-head .msg{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                    max-width:60ch;flex:1 1 auto;min-width:0}
+  .commit-head .right{margin-left:auto;color:var(--muted);font-size:13px;display:inline-flex;
+                      align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
+  .commit-head .right .sep{opacity:.5}
+  .commit-head .sub{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;
+                    color:var(--muted);align-items:center}
+  .commit-head .sub b{color:var(--fg);font-weight:500}
+  a.ref{display:inline-flex;align-items:center;gap:5px;color:var(--accent);text-decoration:none;
+        font-variant-numeric:tabular-nums;font-size:13px}
+  a.ref:hover{text-decoration:underline}
+  a.ref code{background:transparent;padding:0;font-size:13px}
+  .head-sep{margin:14px 0 8px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+            color:var(--muted);font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .head-sep .oc{width:12px;height:12px}
+  .unchanged{margin:8px 0 0;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+
+  /* panels */
+  .panel{margin-top:18px}
+  .panel h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--fg);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  .panel h4 .head-left{display:inline-flex;align-items:center;gap:8px}
+  .panel h4 .note{text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;color:var(--muted)}
+  .legend{display:inline-flex;gap:12px;text-transform:none;letter-spacing:0;font-weight:400;font-size:11.5px;color:var(--muted);align-items:center;flex-wrap:wrap}
+  .legend .lg{display:inline-flex;align-items:center;gap:5px}
+  .legend .lg::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c-context)}
+  .legend .lg.origin::before{background:var(--c-origin)}
+  .legend .lg.change::before{background:var(--c-change)}
+  .legend .lg.discussion::before{background:var(--c-discussion)}
+
+  /* change cards — colored 3px left strip rendered as a STRAIGHT rectangle via ::before so
+     it doesn't follow the card's border-radius curves. The card's left corners are flat
+     so the strip meets the top/bottom borders at clean right angles. */
+  .changecard{background:var(--card);border:1px solid var(--border);
+              border-radius:0 12px 12px 0;
+              padding:14px 18px 14px 38px;margin:24px 0;box-shadow:var(--shadow);position:relative}
+  .changecard::before,.event-card::before{
+    content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;
+    background:var(--c-change);   /* default — overridden by kind-X */
+    z-index:1
+  }
+  /* shared kind→color mapping for both card types */
+  .changecard.kind-change::before,.event-card.kind-change::before{background:var(--c-change)}
+  .changecard.kind-discussion::before,.event-card.kind-discussion::before{background:var(--c-discussion)}
+  .changecard.kind-context::before,.event-card.kind-context::before{background:var(--c-context)}
+  .changecard.kind-addition::before,.event-card.kind-addition::before{background:var(--c-addition)}
+  .changecard.kind-removal::before,.event-card.kind-removal::before{background:var(--c-removal)}
+  .changecard:first-child{margin-top:8px}
+  .changecard:last-child{margin-bottom:0}
+  /* subtle horizontal rule after the commit-head row */
+  hr.card-divider{border:0;border-top:1px solid var(--border);margin:12px 0}
+  /* left-edge ribbon carrying the PR + ticket + commit icon-links — mostly OUTSIDE the card
+     so it reads as a floating tab. Vertically centered so it never collides with the
+     history-track dot at the top of the card. */
+  .card-ribbon{position:absolute;left:-14px;top:50%;transform:translateY(-50%);
+               background:var(--card);border:1px solid var(--border);
+               border-radius:var(--radius-sm);padding:var(--space-xs) var(--space-xs);
+               display:flex;flex-direction:column;gap:var(--space-xs);
+               box-shadow:var(--shadow-float);z-index:1}
+  .card-ribbon a{display:inline-flex;align-items:center;justify-content:center;
+                 width:22px;height:22px;color:var(--accent);text-decoration:none;border-radius:4px}
+  .card-ribbon a:hover{background:var(--accent-bg)}
+  .card-ribbon a .oc{width:14px;height:14px}
+  .changecard .snippet{margin-top:12px;background:var(--code-bg);border:1px solid var(--border);
+                       border-radius:8px;padding:10px 12px;overflow-x:auto}
+  .changecard .snippet pre{margin:0;padding:0;background:none;border:none}
+  .changecard .snippet pre code{background:none;padding:0;font-size:.85em;
+                                font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .changecard .why{margin-top:12px;font-size:14px;color:var(--fg);line-height:1.55}
+  .changecard .why > *:first-child{margin-top:0}
+  .changecard .why > *:last-child{margin-bottom:0}
+
+  /* discussion card — same frame, blockquote-styled body for verbatim source quotes */
+  .changecard.discussioncard .discussion-quote{
+    margin:var(--space-md) 0 0;
+    padding:var(--space-sm) var(--space-md);
+    border-left:3px solid var(--accent);
+    background:var(--subtle);
+    border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+    color:var(--fg);
+    font-size:var(--font-md);
+    line-height:1.55
+  }
+  .changecard.discussioncard .discussion-quote > *:first-child{margin-top:0}
+  .changecard.discussioncard .discussion-quote > *:last-child{margin-bottom:0}
+  .changecard.discussioncard .discussion-quote p{margin:.4em 0}
+
+  /* risk cards — same visual frame as changecards, no avatar/ribbon, amber icon */
+  .riskcard{background:var(--card);border:1px solid var(--border);border-radius:12px;
+            padding:14px 18px;margin:24px 0;box-shadow:var(--shadow);position:relative}
+  .riskcard:first-child{margin-top:8px}
+  .riskcard:last-child{margin-bottom:0}
+  .riskcard .risk-head{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45}
+  .riskcard .risk-head .oc{width:18px;height:18px;color:var(--alert-icon);flex-shrink:0;margin-top:1px;fill:currentColor}
+  .riskcard .risk-title{font-weight:600;color:var(--fg);flex:1;min-width:0}
+  .riskcard .risk-body{font-size:14px;line-height:1.6;color:var(--fg)}
+  .riskcard .risk-body > *:first-child{margin-top:0}
+  .riskcard .risk-body > *:last-child{margin-bottom:0}
+  .riskcard .risk-body p+p,.riskcard .risk-body ul,.riskcard .risk-body ol{margin-top:.5em}
+
+  /* revert / alert callout — all colors flow from theme tokens */
+  .alert{background:var(--alert-bg);border:1px solid var(--alert-border);border-radius:var(--radius-md);
+         padding:var(--space-md) var(--space-md);margin-bottom:var(--space-lg);display:flex;gap:var(--space-sm);
+         align-items:flex-start;font-size:var(--font-sm);color:var(--alert-fg)}
+  .alert .oc{color:var(--alert-icon);width:18px;height:18px;flex-shrink:0;margin-top:2px}
+  .alert .body{flex:1;min-width:0}
+  .alert h5{margin:0 0 4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .alert ul{margin:4px 0 0;padding-left:18px}
+  .alert ul li{margin:3px 0}
+  .alert a{color:inherit;text-decoration:underline;font-weight:600}
+
+  /* frequent authors list */
+  .authors{display:flex;flex-direction:column;gap:2px;font-size:13px;margin-top:6px}
+  .authors .row{display:flex;align-items:center;gap:12px;padding:6px 0}
+  .authors .row + .row{border-top:1px solid var(--border)}
+  .authors .row img.avatar,.authors .row .avatar-empty{width:28px;height:28px}
+  .authors .meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .authors .who{display:flex;align-items:baseline;gap:7px;min-width:0}
+  .authors .who .name{font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .authors .who .email{color:var(--muted);font-size:11.5px;
+                       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+                       overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1}
+  .authors .stats{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;
+                  flex-shrink:0;text-align:right;white-space:nowrap}
+  .authors .stats b{color:var(--fg);font-weight:600}
+  .authors .stats .sep{opacity:.5;margin:0 4px}
+
+  /* used-by list + collapsible panel */
+  details.panel.collapsible{display:block}
+  details.panel.collapsible > summary{
+    margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--fg);font-weight:700;display:flex;justify-content:space-between;
+    align-items:center;gap:14px;flex-wrap:wrap;list-style:none;cursor:pointer;
+    padding:4px;border-radius:6px;margin-left:-4px;margin-right:-4px}
+  details.panel.collapsible > summary::-webkit-details-marker{display:none}
+  details.panel.collapsible > summary:hover{background:var(--subtle)}
+  details.panel.collapsible > summary .head-right{
+    display:inline-flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;
+    font-weight:400;font-size:12.5px;color:var(--muted)}
+  details.panel.collapsible > summary .disc{
+    width:18px;height:18px;color:var(--muted);transition:transform .15s ease;
+    transform-origin:50% 50%;flex-shrink:0;fill:currentColor}
+  details.panel.collapsible[open] > summary .disc{transform:rotate(90deg)}
+  details.panel.collapsible > summary:hover .disc{color:var(--fg)}
+  .usedby{display:flex;flex-direction:column;gap:2px;font-size:13px;margin-top:6px}
+  .usedby .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0}
+  .usedby .row + .row{border-top:1px solid var(--border)}
+  .usedby .row .name{display:inline-flex;align-items:center;gap:5px;color:var(--accent);text-decoration:none;min-width:0;overflow:hidden}
+  .usedby .row .name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .usedby .row .name:hover{text-decoration:underline}
+  .usedby .row .name.nolink{color:var(--fg);text-decoration:none}
+  .usedby .row .hits{font-variant-numeric:tabular-nums;color:var(--muted);font-size:11.5px;
+                     background:var(--subtle);padding:2px 8px;border-radius:999px;flex-shrink:0;white-space:nowrap}
+
+  /* coupling list */
+  .coupling{display:flex;flex-direction:column;gap:5px;font-size:13px}
+  .coupling .row{display:grid;grid-template-columns:1fr 110px 44px;align-items:center;gap:10px}
+  .coupling .row .barwrap{height:8px;background:var(--subtle);border-radius:999px;overflow:hidden}
+  .coupling .row .bar{height:100%;background:var(--accent);border-radius:999px}
+  .coupling .row .pct{font-variant-numeric:tabular-nums;color:var(--muted);text-align:right;font-size:12px}
+  .coupling a{color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+  .coupling a:hover{text-decoration:underline}
+
+  /* rendered markdown */
+  article{font-size:15.5px}
+  article h1{font-size:1.6em;line-height:1.2;margin:0 0 .25em;letter-spacing:-.01em}
+  article h2{font-size:1.18em;margin:1.6em 0 .35em;padding-bottom:.25em;border-bottom:1px solid var(--border);scroll-margin-top:80px}
+  article h3{font-size:1.04em;margin:1.2em 0 .25em;scroll-margin-top:80px}
+  article p,article li{color:var(--fg)}
+  article a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}
+  article a:hover{border-bottom-color:var(--accent)}
+  /* Inline code — applies to all markdown-rendered prose (main article, card whys, risk
+     bodies, revert whys). `pre code` overrides reset the styling for code blocks. */
+  article code,
+  .changecard .why code,
+  .riskcard .risk-body code,
+  .revert-row .why code{
+    background:var(--code-bg);border:1px solid var(--code-border);
+    padding:.05em .42em;border-radius:var(--radius-sm);font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+  }
+  article pre{background:var(--code-bg);padding:12px 14px;border-radius:10px;overflow-x:auto;border:1px solid var(--border)}
+  article pre code,
+  .changecard .why pre code,
+  .riskcard .risk-body pre code,
+  .revert-row .why pre code{background:none;padding:0;border:none;font-size:.86em}
+  article blockquote{margin:.6em 0;padding:.1em 1em;border-left:3px solid var(--border);color:var(--muted)}
+  article table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.94em}
+  article th,article td{border:1px solid var(--border);padding:6px 9px;text-align:left}
+  article th{background:var(--code-bg)}
+  article ul,article ol{padding-left:1.4em}
+  article li + li{margin-top:.5rem}
+  article hr{border:0;border-top:1px solid var(--border);margin:1.6em 0}
+
+  /* raw + toast */
+  details.raw{margin:40px 0 0;border-top:1px dashed var(--border);padding-top:14px}
+  details.raw summary{cursor:pointer;color:var(--muted);font-size:13px}
+  textarea#raw{width:100%;min-height:340px;margin-top:10px;padding:12px;border-radius:10px;
+               border:1px solid var(--border);background:var(--code-bg);color:var(--fg);
+               font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--fg);
+         color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;
+         transition:opacity .2s;pointer-events:none}.toast.show{opacity:1}
+
+  /* --------------------------------------------------------------------------------
+     Merged History track — single chronological feed. Vertical line sits at the
+     horizontal CENTER of the track; cards (full-width) and mini event cards (75%
+     width, centered) sit on top, covering the line. The line is therefore only
+     visible in the gaps between entries — visually connecting them.
+     -------------------------------------------------------------------------------- */
+  .history-track{position:relative;margin:var(--space-md) 0 0}
+  .history-track::before{
+    content:"";position:absolute;left:50%;top:0;bottom:0;
+    width:var(--history-bar-width);
+    margin-left:calc(var(--history-bar-width) * -0.5);
+    background:var(--border);z-index:0;pointer-events:none;
+  }
+  .hist-entry{position:relative;z-index:1;margin:var(--space-lg) 0;display:flex;justify-content:center}
+  .hist-entry:first-child{margin-top:var(--space-sm)}
+  .hist-entry:last-child{margin-bottom:0}
+  /* full-size cards: 100% width; their margin is owned by .hist-entry */
+  .hist-entry.hist-card .hist-content,
+  .hist-entry.hist-discussion .hist-content{width:100%;position:relative;z-index:1}
+  .hist-entry.hist-card .changecard{margin:0}
+  /* nested cards: 70% width, right-aligned, sit visually attached to the parent above */
+  .hist-entry.hist-nested{justify-content:flex-end;margin-top:var(--space-sm)}
+  .hist-entry.hist-nested .hist-content{width:70%}
+  /* mini event card — 75% width, centered, card-style frame with the same 3px colored
+     left strip as full-size cards. Label on the left, date on the right (relative + absolute). */
+  .hist-entry.hist-event{display:block}
+  .hist-entry.hist-event .event-card{
+    width:var(--history-mini-width);
+    margin:0 auto;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:0 var(--radius-md) var(--radius-md) 0;
+    padding:var(--space-sm) var(--space-md);
+    box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:var(--space-md);
+    font-size:var(--font-md);
+    position:relative;z-index:1;
+  }
+  .hist-entry.hist-event .hist-date{color:var(--muted);font-size:var(--font-sm);
+                                    font-variant-numeric:tabular-nums;cursor:help;
+                                    flex-shrink:0;text-align:right;white-space:nowrap}
+  .hist-entry.hist-event .hist-date .sep{opacity:.5;margin:0 4px}
+  .hist-event-label{color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;
+                    gap:var(--space-xs);flex:1;min-width:0;overflow:hidden}
+  .hist-event-label > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hist-event-label:hover{text-decoration:underline}
+  .hist-event-label .oc{width:var(--oc-size);height:var(--oc-size);flex-shrink:0}
+
+  /* --------------------------------------------------------------------------------
+     Person chip — gravatar + linked name, applied wherever a known person is mentioned
+     in the prose. Inserted by JS after the markdown renders.
+     -------------------------------------------------------------------------------- */
+  .person{display:inline-flex;align-items:center;gap:var(--space-xs);
+          vertical-align:middle;       /* aligns chip middle to surrounding text x-height */
+          line-height:1;white-space:nowrap;
+          margin-top:-2px;               /* nudges the chip onto the text baseline visually */
+          margin-bottom:-2px}
+  .person img.person-avatar,.person .person-avatar-empty{
+    width:18px;height:18px;border-radius:50%;background:var(--subtle);object-fit:cover;flex-shrink:0
+  }
+  .person a{color:var(--accent);text-decoration:none}
+  .person a:hover{text-decoration:underline}
+
+  /* vertical timeline — dot center (col 11px) and bar center (col 11px) match exactly */
+  .timeline-v{position:relative;margin:6px 0 0;padding-left:30px}
+  .timeline-v::before{content:"";position:absolute;left:10px;top:14px;bottom:14px;width:2px;background:var(--border)}
+  .tev{position:relative;padding:6px 0;font-size:13.5px;display:flex;align-items:baseline;gap:12px;line-height:1.5}
+  .tev .tdot{position:absolute;left:-26px;top:10px;width:14px;height:14px;border-radius:50%;
+             background:var(--c-context);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--border)}
+  .tev .tdot.origin{background:var(--c-origin)}
+  .tev .tdot.change{background:var(--c-change)}
+  .tev .tdot.discussion{background:var(--c-discussion)}
+  .tev .tdate{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:88px;cursor:help}
+  .tev .tlabel{color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:5px;flex:1;min-width:0}
+  .tev .tlabel:hover{text-decoration:underline}
+  .tev .tlabel .oc{width:13px;height:13px;flex-shrink:0}
+  .tev .tlabel.nolink{color:var(--fg);cursor:default}
+  .tev .tlabel.nolink:hover{text-decoration:none}
+
+  /* svg */
+  svg.timeline,svg.histogram{width:100%;display:block;overflow:visible}
+  svg .axis{stroke:var(--border)}
+  svg .gridline{stroke:var(--border);stroke-dasharray:2 3}
+  svg .tlabel{fill:var(--muted);font-size:11px;font-family:inherit}
+  svg .bar{fill:var(--accent);opacity:.85}
+  svg .bar:hover{opacity:1}
+
+  /* highlight.js GitHub theme — light by default; dark in OS-dark mode (via @media);
+     also dark whenever the Terminal theme is active (via CSS nesting under the
+     attribute selector — supported in Chrome 112+ / Safari 16.5+ / Firefox 117+). */
+  __HLJS_LIGHT_CSS__
+  @media (prefers-color-scheme: dark) { __HLJS_DARK_CSS__ }
+  :root[data-theme="terminal"] { __HLJS_DARK_CSS__ }
+  .hljs{background:transparent !important;padding:0 !important}
+
+  /* tooltip ? badge — built-in browser CSS only */
+  .info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;
+        border-radius:50%;background:var(--subtle);color:var(--muted);font-size:10px;
+        font-weight:700;cursor:help;position:relative;margin-left:6px;flex-shrink:0;
+        font-family:inherit;border:1px solid var(--border);user-select:none}
+  .info::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);
+               background:var(--fg);color:var(--bg);padding:7px 10px;border-radius:6px;
+               font-size:11.5px;line-height:1.45;font-weight:400;letter-spacing:0;
+               text-transform:none;font-family:inherit;width:260px;text-align:left;
+               white-space:normal;opacity:0;pointer-events:none;transition:opacity .15s;
+               z-index:200;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  .info:hover::after,.info:focus-visible::after{opacity:1}
+
+  /* "View on GitHub" link under snippets */
+  .snippet-meta{display:flex;justify-content:flex-end;margin-top:6px}
+  .snippet-meta a{display:inline-flex;align-items:center;gap:5px;font-size:12px;
+                  color:var(--muted);text-decoration:none}
+  .snippet-meta a:hover{color:var(--accent);text-decoration:underline}
+  .snippet-meta .oc{width:11px;height:11px}
+
+  /* revert sub-list inside Significant changes */
+  .alert.inline{margin:0 0 12px}
+  .revert-list{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+  .revert-list h5{margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+                  color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+  .revert-row{padding:10px 0;font-size:13.5px;color:var(--fg)}
+  .revert-row + .revert-row{border-top:1px solid var(--border)}
+  .revert-arc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;line-height:1.7}
+  .revert-arc .ref{font-size:13px}
+  .revert-arc .arrow{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .revert-row .why{margin-top:8px;font-size:13.5px;color:var(--fg);line-height:1.55}
+  .revert-row .why p{margin:0 0 4px}
+  .revert-row .why p:last-child{margin-bottom:0}
+  .revert-row .why strong{font-weight:600;color:var(--fg)}
+  /* timeline labels via foreignObject — styled as proper links */
+  .tl-wrap{display:flex;align-items:center;justify-content:center;height:100%;width:100%;
+           text-align:center;line-height:1.2}
+  a.tl-label{display:inline-flex;align-items:center;gap:5px;color:var(--accent);text-decoration:none;
+             font-size:11.5px;cursor:pointer;border-bottom:1px solid transparent;padding:1px 2px}
+  a.tl-label:hover{border-bottom-color:var(--accent)}
+  span.tl-label{display:inline-flex;align-items:center;gap:5px;color:var(--fg);font-size:11.5px}
+  .tl-label .oc{width:11px;height:11px}
+</style>
+</head>
+<body>
+
+<!-- Inlined Primer Octicons (MIT-licensed), referenced via <use href="#oc-…">. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="oc-commit" viewBox="0 0 16 16"><path fill="currentColor" d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></symbol>
+  <symbol id="oc-pr" viewBox="0 0 16 16"><path fill="currentColor" d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></symbol>
+  <symbol id="oc-tag" viewBox="0 0 16 16"><path fill="currentColor" d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></symbol>
+  <symbol id="oc-person" viewBox="0 0 16 16"><path fill="currentColor" d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 4a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></symbol>
+  <symbol id="oc-calendar" viewBox="0 0 16 16"><path fill="currentColor" d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0ZM2.5 7.5v6.75c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V7.5Zm10.75-1.5v-2.5a.25.25 0 0 0-.25-.25H2.75a.25.25 0 0 0-.25.25V6Z"/></symbol>
+  <symbol id="oc-file-code" viewBox="0 0 16 16"><path fill="currentColor" d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L7.19 9.25 5.72 7.78a.75.75 0 0 1 0-1.06ZM3.28 7.78 1.81 9.25l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042ZM11.5 1.5v2.75c0 .138.112.25.25.25h2.5L11.5 1.5Z"/></symbol>
+  <symbol id="oc-comment" viewBox="0 0 16 16"><path fill="currentColor" d="M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Zm13 2a.25.25 0 0 0-.25-.25h-.5a.75.75 0 0 1 0-1.5h.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 14.25 12H14v1.543a1.458 1.458 0 0 1-2.487 1.03L9.22 12.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.22 2.22v-2.19a.75.75 0 0 1 .75-.75h1a.25.25 0 0 0 .25-.25Z"/></symbol>
+  <symbol id="oc-alert" viewBox="0 0 16 16"><path fill="currentColor" d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></symbol>
+  <symbol id="oc-link-external" viewBox="0 0 16 16"><path fill="currentColor" d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"/></symbol>
+  <symbol id="oc-chevron-right" viewBox="0 0 16 16"><path fill="currentColor" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></symbol>
+</svg>
+
+<header class="page">
+  <div class="hd-inner">
+    <div class="grow"><h1 id="title">__TITLE__</h1><div class="subtitle" id="subtitle"></div></div>
+  </div>
+</header>
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="toc-h">On this page</div>
+    <nav id="toc"></nav>
+    <div class="sidebar-actions">
+      <div class="actions-h">Actions</div>
+      <label class="control">
+        <span class="ctl-label">Theme</span>
+        <select id="themeSel" aria-label="Theme">
+          <option value="default">Default</option>
+          <option value="terminal">Terminal</option>
+        </select>
+      </label>
+      <button class="primary" id="copyBtn">Copy markdown</button>
+      <button id="rawBtn">Toggle raw</button>
+    </div>
+  </aside>
+  <main>
+    <section id="glance" class="glance" hidden></section>
+    <article id="rendered"></article>
+    <details class="raw" id="rawWrap"><summary>Raw markdown</summary><textarea id="raw" readonly></textarea></details>
+  </main>
+</div>
+<div class="toast" id="toast">Copied</div>
+
+<script>__MARKED_JS__</script>
+<script>__HLJS_JS__</script>
+<script>
+const MARKDOWN = __MARKDOWN_JSON__;
+const DATA = __DATA_JSON__;          // may be null
+const GENERATED = "__GENERATED__";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Avatar resolution — ONE shared primitive used everywhere an avatar appears:
+   significant-change cards, discussion cards, the at-a-glance head, the
+   Frequent-authors panel, and inline prose person-chips. Resolution order:
+     1. an explicit avatar_url the sidecar gave for that entry,
+     2. the avatar already known for that person in the people index — so a
+        card/discussion author who is also a frequent author transparently
+        reuses find_authors' gravatar, with zero per-card plumbing,
+     3. a GitHub avatar derived from a handle-shaped reference.
+   Every rendered <img> carries an onerror that degrades to an empty circle,
+   so a 404 from step 3 shows a blank avatar, never a broken-image icon. That
+   safety net is why deriving github.com/<handle>.png is safe here even though
+   a bare guess was previously avoided: a miss is now invisible, while the
+   common case (author IS a real handle) renders a real avatar instead of the
+   empty circle that used to be the default for every card. */
+const GH_HANDLE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]){0,38}$/;
+function githubHandle(ref){
+  const s = ref == null ? '' : String(ref).trim();
+  return GH_HANDLE_RE.test(s) ? s : null;
+}
+function githubAvatarFor(ref){
+  const h = githubHandle(ref);
+  return h ? `https://github.com/${encodeURIComponent(h)}.png?size=144` : null;
+}
+/* Single identity index, built once from every person-bearing field in DATA
+   (see buildPeopleLookup). All avatar/chip rendering reads from this. */
+const PEOPLE = buildPeopleLookup(DATA || {});
+function resolveAvatarUrl(ref, explicitUrl){
+  if (explicitUrl) return explicitUrl;
+  const key = ref == null ? '' : String(ref).trim().toLowerCase();
+  if (key && PEOPLE[key] && PEOPLE[key].avatar) return PEOPLE[key].avatar;
+  return githubAvatarFor(ref);
+}
+/* Gate a resolved avatar URL before it goes into an <img src>. Avatar data
+   ultimately derives from git author names/emails and PR content, so an
+   explicit avatar_url could in principle carry a javascript:/quote payload.
+   Parse it, allow only http/https, and return a normalized string (callers
+   still esc() it for the attribute). Anything else → null → empty circle. */
+function safeAvatarSrc(url){
+  if (!url) return null;
+  try {
+    const u = new URL(String(url).trim(), document.baseURI);
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ---------- helpers ---------- */
+function esc(s){return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function fmtDate(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?s:d.toISOString().slice(0,10); }
+function fmtRelative(s){
+  if (!s) return '';
+  const d = new Date(s); if (isNaN(d)) return '';
+  const now = new Date();
+  let diff = (now - d) / 1000;          // seconds
+  const future = diff < 0; diff = Math.abs(diff);
+  // (divisor, nextUnit) — value starts in seconds; each entry converts to the next coarser unit.
+  const ladder = [[60,'minute'],[60,'hour'],[24,'day'],[7,'week'],[4.345,'month'],[12,'year']];
+  let value = diff, unit = 'second';
+  for (const [step, nextUnit] of ladder){
+    if (value < step) break;
+    value = value / step;
+    unit = nextUnit;
+  }
+  value = Math.round(value);
+  const plural = value === 1 ? '' : 's';
+  return future ? `in ${value} ${unit}${plural}` : (value === 0 ? 'just now' : `${value} ${unit}${plural} ago`);
+}
+function ocSpan(id){return `<svg class="oc"><use href="#${id}"/></svg>`;}
+function kindIcon(kind){return ({origin:'oc-commit', change:'oc-pr', discussion:'oc-comment', context:'oc-calendar'})[kind] || 'oc-calendar';}
+
+/* ---------- render markdown ---------- */
+marked.setOptions({gfm:true});
+const art = document.getElementById('rendered');
+art.innerHTML = marked.parse(MARKDOWN);
+art.querySelectorAll('a[href]').forEach(a=>{a.target='_blank';a.rel='noopener'});
+document.getElementById('raw').value = MARKDOWN;
+
+/* ---------- ToC ---------- */
+const slug = s => s.toLowerCase().replace(/[^\w]+/g,'-').replace(/^-|-$/g,'').slice(0,60) || 'section';
+const toc = document.getElementById('toc');
+const heads = Array.from(art.querySelectorAll('h2, h3'));
+const used = new Set();
+heads.forEach(h=>{
+  let id = slug(h.textContent); let n=1;
+  while(used.has(id)) id = slug(h.textContent)+'-'+(++n);
+  used.add(id); h.id = id;
+  const a = document.createElement('a');
+  a.href = '#'+id; a.textContent = h.textContent;
+  if (h.tagName==='H3') a.className = 'h3';
+  toc.appendChild(a);
+});
+if (heads.length){
+  const map = new Map(heads.map(h=>[h.id, toc.querySelector('a[href="#'+h.id+'"]')]));
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(e=>{ const a = map.get(e.target.id);
+      if (!a) return;
+      if (e.isIntersecting) {toc.querySelectorAll('a.active').forEach(x=>x.classList.remove('active')); a.classList.add('active');}
+    });
+  }, {rootMargin: '-80px 0px -70% 0px', threshold: 0});
+  heads.forEach(h=>io.observe(h));
+}
+
+/* ---------- subtitle ---------- */
+if (DATA && (DATA.subject || DATA.file)){
+  const parts = [];
+  if (DATA.subject) parts.push(`<b>${esc(DATA.subject)}</b>`);
+  if (DATA.file){
+    const lbl = `${ocSpan('oc-file-code')} ${esc(DATA.file)}`;
+    parts.push(DATA.file_url ? `<a class="ref" href="${DATA.file_url}" target="_blank">${lbl}</a>` : `<span>${lbl}</span>`);
+  }
+  document.getElementById('subtitle').innerHTML = parts.join(' &middot; ');
+}
+
+/* ---------- at-a-glance ---------- */
+function refLink(icon, text, href){
+  const inner = `${ocSpan(icon)}<span>${text}</span>`;
+  return href ? `<a class="ref" href="${href}" target="_blank">${inner}</a>` : `<span class="ref" style="color:var(--fg)">${inner}</span>`;
+}
+function avatarBlock(author, avatarUrl){
+  // Resolve through the shared primitive (explicit url → people index → derived
+  // github avatar). The onerror degrades a missed derive to an empty circle, so
+  // there are no broken images and cards no longer default to a blank avatar.
+  const src = safeAvatarSrc(resolveAvatarUrl(author, avatarUrl));
+  if (!src) return `<span class="avatar-empty" aria-hidden="true"></span>`;
+  return `<img class="avatar" src="${esc(src)}" alt="${esc(author||'')}" `
+       + `onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-empty'}))">`;
+}
+function commitHead(o, opts){
+  /* PR + ticket + commit-sha condensed to icon-links stacked under the avatar — the ID lives
+     in the hover title. Pass {noIcons:true} when used inside a changecard (the card's left
+     ribbon renders them instead); pass {noSha:true} as well to suppress the SHA chip from
+     the right side (the ribbon's commit icon links to it). */
+  const noIcons = opts && opts.noIcons;
+  const noSha = opts && opts.noSha;
+  const iconRefs = [];
+  if (!noIcons && o.pr)
+    iconRefs.push(`<a href="${o.pr_url||'#'}" target="_blank" title="PR #${o.pr}" aria-label="PR #${o.pr}">${ocSpan('oc-pr')}</a>`);
+  if (!noIcons && o.ticket)
+    iconRefs.push(`<a href="${o.ticket_url||'#'}" target="_blank" title="${esc(o.ticket)}" aria-label="${esc(o.ticket)}">${ocSpan('oc-tag')}</a>`);
+
+  const right = [];
+  const showSha = !noSha && o.sha;
+  if (showSha) right.push(`<a class="ref" href="${o.sha_url||'#'}" target="_blank">${ocSpan('oc-commit')}<code>${esc(o.sha)}</code></a>`);
+  if (o.date) {
+    const rel = fmtRelative(o.date), abs = fmtDate(o.date);
+    const prefix = showSha ? `<span class="sep">·</span>` : '';
+    right.push(`${prefix}<span title="${abs}">${esc(rel)}</span><span class="sep">·</span><span>${abs}</span>`);
+  }
+  /* Project / milestone stay in the sub-line — only when linkable. */
+  const sub = [];
+  if (o.project && o.project_url)
+    sub.push(`<a class="ref" href="${o.project_url}" target="_blank">Project: <b>${esc(o.project)}</b></a>`);
+  if (o.milestone && o.milestone_url)
+    sub.push(`<a class="ref" href="${o.milestone_url}" target="_blank">Milestone: <b>${esc(o.milestone)}</b></a>`);
+
+  const titleText = o.title || '';
+  const title = titleText ? `<span class="msg" title="${esc(titleText)}">${esc(titleText)}</span>` : '';
+  const author = o.author ? `<span class="author">${esc(o.author)}</span>` : '';
+  return `<div class="commit-head">`
+       +   `<div class="commit-head-left">`
+       +     avatarBlock(o.author, o.avatar_url)
+       +     (iconRefs.length ? `<div class="icon-refs">${iconRefs.join('')}</div>` : '')
+       +   `</div>`
+       +   `<div class="body">`
+       +     `<div class="top">${author}${title}<div class="right">${right.join('')}</div></div>`
+       +     (sub.length ? `<div class="sub">${sub.join('')}</div>` : '')
+       +   `</div>`
+       + `</div>`;
+}
+
+function discussioncard(d){
+  /* Discussion cards share the changecard frame — same ribbon-on-left, commit-head row,
+     subtle HR — but the body is a blockquote (the verbatim source quote) plus optional
+     prose, rather than a code snippet. The ribbon icon shifts based on where the
+     discussion lives (PR review, Slack, ticket, doc). */
+  const ribbonIconByKind = {
+    'pr-review': 'oc-pr',
+    'pr': 'oc-pr',
+    'review': 'oc-pr',
+    'slack': 'oc-comment',
+    'discord': 'oc-comment',
+    'chat': 'oc-comment',
+    'discussion': 'oc-comment',
+    'linear': 'oc-tag',
+    'ticket': 'oc-tag',
+    'jira': 'oc-tag',
+    'issue': 'oc-tag',
+    'documentation': 'oc-file-code',
+    'doc': 'oc-file-code',
+    'notion': 'oc-file-code',
+    'rfc': 'oc-file-code',
+  };
+  const ribbonIcon = ribbonIconByKind[String(d.kind || '').toLowerCase()] || 'oc-comment';
+  const ribbon = d.url
+    ? `<div class="card-ribbon"><a href="${d.url}" target="_blank" title="${esc(d.kind || 'source')}" aria-label="open source">${ocSpan(ribbonIcon)}</a></div>`
+    : '';
+
+  const right = [];
+  if (d.date){
+    const rel = fmtRelative(d.date), abs = fmtDate(d.date);
+    right.push(`<span title="${abs}">${esc(rel)}</span><span class="sep">·</span><span>${abs}</span>`);
+  }
+
+  const titleText = d.title || '';
+  const title = titleText ? `<span class="msg" title="${esc(titleText)}">${esc(titleText)}</span>` : '';
+  const author = d.author ? `<span class="author">${esc(d.author)}</span>` : '';
+  const quote = d.quote ? `<blockquote class="discussion-quote">${marked.parse(d.quote)}</blockquote>` : '';
+  const body = d.body ? `<div class="why">${marked.parse(d.body)}</div>` : '';
+  const hr = (quote || body) ? `<hr class="card-divider">` : '';
+  const stripKind = discussionStripKind(d.kind);
+  return `<div class="changecard discussioncard kind-${stripKind}">`
+       + ribbon
+       + `<div class="commit-head">`
+       +   `<div class="commit-head-left">${avatarBlock(d.author, d.avatar_url)}</div>`
+       +   `<div class="body">`
+       +     `<div class="top">${author}${title}<div class="right">${right.join('')}</div></div>`
+       +   `</div>`
+       + `</div>`
+       + hr
+       + quote
+       + body
+       + `</div>`;
+}
+
+function riskCard(r){
+  const title = r.title
+    ? `<div class="risk-head">${ocSpan('oc-alert')}<span class="risk-title">${esc(r.title)}</span></div>`
+    : '';
+  const body = r.body ? marked.parse(r.body) : '';
+  const hr = (title && body) ? `<hr class="card-divider">` : '';
+  return `<div class="riskcard">${title}${hr}${body ? `<div class="risk-body">${body}</div>` : ''}</div>`;
+}
+/* Map a discussion's source-kind to the color-strip category. `pr-review`/`slack`/`chat`
+   land in the discussion category (green); `linear`/`jira`/`ticket`/`doc` land in the
+   context category (gray). */
+function discussionStripKind(kind){
+  const k = String(kind || '').toLowerCase();
+  if (['linear','jira','ticket','issue','documentation','doc','notion','rfc'].includes(k)) return 'context';
+  return 'discussion';
+}
+
+function changecard(c){
+  /* Left-side ribbon: PR + ticket + commit-sha icons. The corresponding chips inside the
+     commit-head are suppressed (noIcons + noSha). */
+  const ribbon = [];
+  if (c.pr)
+    ribbon.push(`<a href="${c.pr_url||'#'}" target="_blank" title="PR #${c.pr}" aria-label="PR #${c.pr}">${ocSpan('oc-pr')}</a>`);
+  if (c.ticket)
+    ribbon.push(`<a href="${c.ticket_url||'#'}" target="_blank" title="${esc(c.ticket)}" aria-label="${esc(c.ticket)}">${ocSpan('oc-tag')}</a>`);
+  if (c.sha)
+    ribbon.push(`<a href="${c.sha_url||'#'}" target="_blank" title="commit ${esc(c.sha)}" aria-label="commit ${esc(c.sha)}">${ocSpan('oc-commit')}</a>`);
+  const ribbonEl = ribbon.length ? `<div class="card-ribbon">${ribbon.join('')}</div>` : '';
+
+  const lang = (c.snippet_lang || 'ruby').toLowerCase();
+  let snippet = '';
+  if (c.snippet){
+    const viewLink = c.snippet_url
+      ? `<div class="snippet-meta"><a href="${c.snippet_url}" target="_blank">${ocSpan('oc-link-external')}View on GitHub</a></div>`
+      : '';
+    snippet = `<div class="snippet"><pre><code class="language-${esc(lang)}">${esc(c.snippet)}</code></pre>${viewLink}</div>`;
+  }
+  const hasBody = !!(c.snippet || c.why);
+  const hr = hasBody ? `<hr class="card-divider">` : '';
+  /* `c.kind` opts in to a more specific strip color: `change` (default) / `addition` /
+     `removal`. Defaulting to `change` keeps existing sidecars working unchanged. */
+  const stripKind = (c.kind && ['change','addition','removal'].includes(String(c.kind).toLowerCase()))
+                  ? String(c.kind).toLowerCase() : 'change';
+  return `<div class="changecard kind-${stripKind}">`
+       + ribbonEl
+       + commitHead(c, {noIcons:true, noSha:true})
+       + hr
+       + snippet
+       + (c.why ? `<div class="why">${marked.parse(c.why)}</div>` : '')
+       + `</div>`;
+}
+function revertBanner(count){
+  const word = count === 1 ? 'revert' : 'reverts';
+  return `<div class="alert inline">${ocSpan('oc-alert')}<div class="body">${count} ${word} found in this file's history.</div></div>`;
+}
+function refPiece(x){
+  if (!x) return '';
+  const parts = [];
+  if (x.pr) parts.push(`<a class="ref" href="${x.pr_url||'#'}" target="_blank">${ocSpan('oc-pr')}#${x.pr}</a>`);
+  if (x.sha) parts.push(`<a class="ref" href="${x.sha_url||'#'}" target="_blank">${ocSpan('oc-commit')}<code>${esc(x.sha)}</code></a>`);
+  return parts.join(' ');
+}
+function revertRow(r){
+  /* Accept the structured shape {revert, original, readded, why} or legacy flat. Each ref
+     may include a `date` field; when present we add a duration phrase ("3 days later",
+     "8 months later") between successive refs. */
+  const rev  = r.revert   || (r.sha          ? {sha:r.sha,          sha_url:r.sha_url,          pr:r.pr,          pr_url:r.pr_url,          date:r.date}          : null);
+  const orig = r.original || (r.reverted_sha ? {sha:r.reverted_sha, sha_url:r.reverted_sha_url, pr:r.reverted_pr, pr_url:r.reverted_pr_url, date:r.reverted_date} : null);
+  const re   = r.readded  || (r.readded_sha  ? {sha:r.readded_sha,  sha_url:r.readded_sha_url,  pr:r.readded_pr,  pr_url:r.readded_pr_url,  date:r.readded_date}  : null);
+  /* Chronological order: original first → revert → re-applied. Durations relate adjacent refs. */
+  const arc = [];
+  if (orig) arc.push(refPiece(orig));
+  if (rev){
+    const gap = (orig && orig.date && rev.date) ? gapBetween(orig.date, rev.date) : '';
+    arc.push(`<span class="arrow">reverted${gap ? ` ${gap} later` : ''}</span>`);
+    arc.push(refPiece(rev));
+  }
+  if (re){
+    const gap = (rev && rev.date && re.date) ? gapBetween(rev.date, re.date) : '';
+    arc.push(`<span class="arrow">re-applied${gap ? ` ${gap} later` : ''}</span>`);
+    arc.push(refPiece(re));
+  }
+  const why = r.why || r.description || '';
+  return `<div class="revert-row">`
+       +   `<div class="revert-arc">${arc.join(' ')}</div>`
+       +   (why ? `<div class="why">${marked.parse(why)}</div>` : '')
+       + `</div>`;
+}
+function infoBadge(text){
+  return `<span class="info" tabindex="0" aria-label="${esc(text)}" data-tip="${esc(text)}">?</span>`;
+}
+
+/* ---------- merged history (cards + event rows on one vertical track) ---------- */
+function buildHistoryEntries(data){
+  const events = (data.events || []).filter(e => e && e.url);
+  const changes = Array.isArray(data.significant_changes) ? data.significant_changes.slice() : [];
+  const discussions = Array.isArray(data.discussions) ? data.discussions.slice() : [];
+
+  /* Map URLs → change index so we can find a discussion's parent card by URL match.
+     A discussion is "nested" under a card if its `url` equals the card's sha_url, pr_url,
+     OR ticket_url — i.e. it's a review comment on the PR, or the ticket the PR closes. */
+  const urlToParent = new Map();
+  changes.forEach((c, i) => {
+    if (c.sha_url)    urlToParent.set(c.sha_url, i);
+    if (c.pr_url)     urlToParent.set(c.pr_url, i);
+    if (c.ticket_url) urlToParent.set(c.ticket_url, i);
+  });
+
+  /* Sort discussions into nested-under-a-card vs standalone */
+  const nestedByCard = new Map();   // card index → [discussion]
+  const standaloneDiscussions = [];
+  for (const d of discussions){
+    const parentIdx = d.url ? urlToParent.get(d.url) : undefined;
+    if (parentIdx !== undefined){
+      if (!nestedByCard.has(parentIdx)) nestedByCard.set(parentIdx, []);
+      nestedByCard.get(parentIdx).push(d);
+    } else {
+      standaloneDiscussions.push(d);
+    }
+  }
+
+  /* Top-level URL set for dedupe against events */
+  const topUrls = new Set();
+  for (const c of changes){
+    if (c.sha_url) topUrls.add(c.sha_url);
+    if (c.pr_url)  topUrls.add(c.pr_url);
+  }
+  for (const d of standaloneDiscussions){
+    if (d.url) topUrls.add(d.url);
+  }
+
+  const entries = [];
+  changes.forEach((c, i) => {
+    /* Attach any nested discussions, newest-first within the nested group */
+    const childs = (nestedByCard.get(i) || [])
+      .slice()
+      .sort((a,b) => new Date(b.date) - new Date(a.date));
+    entries.push({type:'card', date:c.date, data:c, kind:'change', children: childs});
+  });
+  for (const d of standaloneDiscussions) entries.push({type:'discussion', date:d.date, data:d, kind:'discussion'});
+  for (const e of events){
+    if (topUrls.has(e.url)) continue;
+    let kind = e.kind || 'context';
+    if (kind === 'origin') kind = 'change';
+    entries.push({type:'event', date:e.date, data:e, kind});
+  }
+  /* newest first (children stay attached to their parent in render) */
+  entries.sort((a,b) => new Date(b.date) - new Date(a.date));
+  return entries;
+}
+
+function renderHistory(entries){
+  if (!entries.length) return '';
+  const rows = [];
+  for (const e of entries){
+    if (e.type === 'card'){
+      rows.push(`<div class="hist-entry hist-card"><div class="hist-content">${changecard(e.data)}</div></div>`);
+      /* Render any nested discussions immediately after the parent — 70% width, right-aligned. */
+      if (Array.isArray(e.children) && e.children.length){
+        for (const child of e.children){
+          rows.push(`<div class="hist-entry hist-card hist-discussion hist-nested"><div class="hist-content">${discussioncard(child)}</div></div>`);
+        }
+      }
+      continue;
+    }
+    if (e.type === 'discussion'){
+      rows.push(`<div class="hist-entry hist-card hist-discussion"><div class="hist-content">${discussioncard(e.data)}</div></div>`);
+      continue;
+    }
+    /* Mini event card — 75% width, centered on the timeline line, no dots. Label on the
+       left, date on the right (relative + absolute, like full cards). The colored 3px
+       left strip mirrors the event's kind. */
+    const stripKind = ['change','discussion','context','addition','removal'].includes(e.kind) ? e.kind : 'context';
+    const icon = ocSpan(kindIcon(e.kind));
+    const rel = fmtRelative(e.data.date), abs = fmtDate(e.data.date);
+    const dateCell = `<span class="hist-date" title="${abs}">`
+                   +   `<span>${esc(rel)}</span><span class="sep">·</span><span>${abs}</span>`
+                   + `</span>`;
+    const labelEl = `<a class="hist-event-label" href="${e.data.url}" target="_blank" rel="noopener">${icon}<span>${esc(e.data.label || '')}</span></a>`;
+    rows.push(`<div class="hist-entry hist-event"><div class="event-card kind-${stripKind}">${labelEl}${dateCell}</div></div>`);
+  }
+  return `<div class="history-track">${rows.join('')}</div>`;
+}
+
+/* ---------- relative gap helper (used for revert durations) ---------- */
+function gapBetween(d1, d2){
+  const ms = new Date(d2) - new Date(d1);
+  if (isNaN(ms) || ms <= 0) return '';
+  let v = ms / 1000;
+  const ladder = [[60,'minute'],[60,'hour'],[24,'day'],[7,'week'],[4.345,'month'],[12,'year']];
+  let u = 'second';
+  for (const [step, next] of ladder){
+    if (v < step) break;
+    v = v / step; u = next;
+  }
+  v = Math.round(v);
+  return `${v} ${u}${v === 1 ? '' : 's'}`;
+}
+
+/* ---------- person chips: walk a markdown-rendered region and replace name mentions
+     with avatar+link chips. Only decorates text nodes; skips A/CODE/PRE/SCRIPT/SVG
+     and anything already chip-styled. ---------- */
+function buildPeopleLookup(data){
+  data = data || {};
+  const people = {};
+  // Register one person record under every alias we know for them — display
+  // name, github handle, and email — so a later lookup by ANY of those keys
+  // (a card's login, a prose mention of their name) resolves to the same
+  // person. First writer wins per key, and frequent_authors is processed
+  // first, so find_authors' gravatar is the authoritative avatar for someone
+  // who appears in multiple sections.
+  function add(displayName, avatarUrl, handle, email){
+    const ghHandle = githubHandle(handle) || githubHandle(displayName);
+    const record = {
+      name: String(displayName || handle || email || ''),
+      avatar: avatarUrl || githubAvatarFor(ghHandle),
+      url: ghHandle ? `https://github.com/${encodeURIComponent(ghHandle)}` : null,
+    };
+    if (!record.name && !ghHandle && !email) return;
+    for (const alias of [displayName, handle, email]){
+      if (alias == null) continue;
+      const key = String(alias).trim().toLowerCase();
+      if (!key) continue;
+      const existing = people[key];
+      if (!existing) {
+        people[key] = record;
+      } else {
+        // Enrich-on-collision: a later, richer sighting of the same person
+        // fills fields the first one left empty, but never overwrites an
+        // existing value. So frequent_authors' gravatar still wins, while a
+        // sparse early entry (e.g. a non-handle origin author with no avatar)
+        // can still gain an avatar/url/name from a later entry.
+        if (!existing.avatar && record.avatar) existing.avatar = record.avatar;
+        if (!existing.url && record.url) existing.url = record.url;
+        if (!existing.name && record.name) existing.name = record.name;
+      }
+    }
+  }
+  for (const a of (data.frequent_authors || [])) add(a.name, a.avatar_url, a.github_handle, a.email);
+  if (data.origin) add(data.origin.author, data.origin.avatar_url, data.origin.author);
+  if (data.recent) add(data.recent.author, data.recent.avatar_url, data.recent.author);
+  for (const c of (data.significant_changes || [])) add(c.author, c.avatar_url, c.author);
+  for (const d of (data.discussions || [])) add(d.author, d.avatar_url, d.author);
+  return people;
+}
+
+function renderPersonChip(p){
+  // Same resolver as the card/panel avatars, so a prose mention and the card it
+  // refers to always show the identical avatar.
+  const src = safeAvatarSrc(resolveAvatarUrl(p.name, p.avatar));
+  const avatar = src
+    ? `<img class="person-avatar" src="${esc(src)}" alt="${esc(p.name)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'person-avatar-empty'}))">`
+    : `<span class="person-avatar-empty" aria-hidden="true"></span>`;
+  const nameStr = esc(p.name);
+  const link = p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${nameStr}</a>` : `<span>${nameStr}</span>`;
+  return `<span class="person">${avatar}${link}</span>`;
+}
+
+function escapeRegex(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+const PERSON_SKIP_TAGS = new Set(['A','CODE','PRE','SCRIPT','STYLE','IMG','SVG','BUTTON','TEXTAREA']);
+
+function decoratePeople(root, people){
+  const keys = Object.keys(people).filter(k => k.length >= 3).sort((a,b) => b.length - a.length);
+  if (!keys.length) return;
+  const re = new RegExp('\\b(' + keys.map(escapeRegex).join('|') + ')\\b', 'gi');
+  function walk(node){
+    if (node.nodeType === Node.TEXT_NODE){
+      const text = node.nodeValue;
+      if (!text || !re.test(text)) return;
+      re.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let lastIndex = 0, m;
+      while ((m = re.exec(text)) !== null){
+        if (m.index > lastIndex) frag.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
+        const person = people[m[0].toLowerCase()];
+        if (person){
+          const tmp = document.createElement('span');
+          tmp.innerHTML = renderPersonChip(person);
+          while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+        } else {
+          frag.appendChild(document.createTextNode(m[0]));
+        }
+        lastIndex = re.lastIndex;
+      }
+      if (lastIndex < text.length) frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+      node.parentNode.replaceChild(frag, node);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (PERSON_SKIP_TAGS.has(node.tagName)) return;
+    if (node.classList && (node.classList.contains('person') || node.classList.contains('commit-head'))) return;
+    for (const child of Array.from(node.childNodes)) walk(child);
+  }
+  walk(root);
+}
+
+(function renderGlance(){
+  if (!DATA) return;
+  const g = document.getElementById('glance');
+  const bits = [];
+
+  /* Unified History panel — merges the old commit-head + Timeline + Significant changes
+     blocks into a single chronological feed. Notable commits expand into cards; everything
+     else appears as a compact row on the same vertical track. Reverts hang off the bottom. */
+  const historyEntries = buildHistoryEntries(DATA);
+  const reverts = Array.isArray(DATA.reverts) ? DATA.reverts : [];
+  if (historyEntries.length || reverts.length){
+    const tipHistory = "The behavior-shaping commits we've curated — full cards for the ones that materially shaped this code, mini cards for the surrounding moments (predecessor PRs, incidents, tickets, discussion) that give them context. Newest first; the vertical line connects them chronologically.";
+    const tipReverts = "Explicit revert pairs found in this file's history — a change that was added, reverted, and sometimes re-applied later.";
+    const legend = '';
+    const revertList = reverts.length
+      ? `<div class="revert-list">`
+        + `<h5>Reverts in this file's history ${infoBadge(tipReverts)}</h5>`
+        + revertBanner(reverts.length)
+        + reverts.map(revertRow).join('')
+        + `</div>`
+      : '';
+    bits.push(`<div class="panel">`
+      + `<h4><span class="head-left">Significant changes ${infoBadge(tipHistory)}</span>${legend}</h4>`
+      + renderHistory(historyEntries)
+      + revertList
+      + `</div>`);
+  }
+
+  /* Histogram with caption (folds in Total touching commits) */
+  const byMonth = DATA.commits_by_month || {};
+  const monthCount = Object.keys(byMonth).length;
+  if (monthCount >= 3){
+    const total = DATA.commits_total || Object.values(byMonth).reduce((a,b)=>a+b,0);
+    const months = Object.keys(byMonth).sort();
+    const note = `${total} touching commits · ${months[0]} → ${months[months.length-1]}`;
+    const tipCadence = "Touching commits per month over the file's life. Tall bars mark periods of active change; gaps mean the code was untouched.";
+    bits.push(`<div class="panel"><h4><span class="head-left">Commit cadence ${infoBadge(tipCadence)}</span><span class="note">${note}</span></h4>${histogramSvg(byMonth)}</div>`);
+  }
+
+  /* Frequent authors — who has shaped this file the most, by commit count
+     (including Co-authored-by trailers), pulled by find_authors.py. */
+  if (Array.isArray(DATA.frequent_authors) && DATA.frequent_authors.length){
+    const rows = DATA.frequent_authors.slice(0, 10).map(a => {
+      const av = avatarBlock(a.name, a.avatar_url);
+      const email = a.email ? `<span class="email">${esc(a.email)}</span>` : '';
+      const commits = `<b>${a.commits}</b> commit${a.commits === 1 ? '' : 's'}`;
+      const last = a.last
+        ? `<span class="sep">·</span><span title="${esc(fmtDate(a.last))}">${esc(fmtRelative(a.last))}</span>`
+        : '';
+      return `<div class="row">${av}`
+           +   `<div class="meta"><div class="who"><span class="name">${esc(a.name || '')}</span>${email}</div></div>`
+           +   `<div class="stats">${commits}${last}</div>`
+           + `</div>`;
+    }).join('');
+    const tipAuthors = "People with the most commits touching this code, including Co-authored-by trailers. Ranked by total commits; hover the relative date to see the exact day of their last contribution.";
+    const an = DATA.frequent_authors.length;
+    const aLabel = `${an} ${an === 1 ? 'person' : 'people'}`;
+    bits.push(
+      `<details class="panel collapsible">`
+      + `<summary>`
+      +   `<span class="head-left">Frequent authors ${infoBadge(tipAuthors)}</span>`
+      +   `<span class="head-right"><span>${aLabel}</span><svg class="disc" viewBox="0 0 16 16"><use href="#oc-chevron-right"/></svg></span>`
+      + `</summary>`
+      + `<div class="authors">${rows}</div>`
+      + `</details>`
+    );
+  }
+
+  /* Used by — structural callers (deterministic, from find_callers.py).
+     Collapsed by default; the summary shows just the count. */
+  if (Array.isArray(DATA.used_by) && DATA.used_by.length){
+    const rows = DATA.used_by.slice(0, 25).map(u => {
+      const lbl = `${ocSpan('oc-file-code')}<span>${esc(u.file)}</span>`;
+      const name = u.url
+        ? `<a class="name" href="${u.url}" target="_blank">${lbl}</a>`
+        : `<span class="name nolink">${lbl}</span>`;
+      const hits = (u.hits && u.hits > 1) ? `<span class="hits">${u.hits} uses</span>` : '';
+      return `<div class="row">${name}${hits}</div>`;
+    }).join('');
+    const n = DATA.used_by.length;
+    const label = `${n} ${n === 1 ? 'file' : 'files'}`;
+    const tipUsedBy = "Files in this repo that reference this code, pulled deterministically with ripgrep (def-lines and the definition file itself are excluded). Click any file to open it on GitHub at the line of reference.";
+    bits.push(
+      `<details class="panel collapsible">`
+      + `<summary>`
+      +   `<span class="head-left">Used by ${infoBadge(tipUsedBy)}</span>`
+      +   `<span class="head-right"><span>${label}</span><svg class="disc" viewBox="0 0 16 16"><use href="#oc-chevron-right"/></svg></span>`
+      + `</summary>`
+      + `<div class="usedby">${rows}</div>`
+      + `</details>`
+    );
+  }
+
+  /* Coupling */
+  if (Array.isArray(DATA.coupling) && DATA.coupling.length){
+    const max = Math.max(...DATA.coupling.map(c=>c.pct||0), 1);
+    const rows = DATA.coupling.slice(0,6).map(c=>{
+      const w = Math.round(100 * (c.pct||0)/max);
+      const lbl = `${ocSpan('oc-file-code')}<span>${esc(c.file)}</span>`;
+      const name = c.url ? `<a href="${c.url}" target="_blank">${lbl}</a>` : `<span style="color:var(--fg)">${lbl}</span>`;
+      return `<div class="row"><div>${name}</div><div class="barwrap"><div class="bar" style="width:${w}%"></div></div><div class="pct">${c.pct||0}%</div></div>`;
+    }).join('');
+    const tipCoupling = "These files were changed in the same commits as this file. High % means they're likely coupled and probably need to be edited together.";
+    const cn = DATA.coupling.length;
+    const cLabel = `${cn} ${cn === 1 ? 'file' : 'files'}`;
+    bits.push(
+      `<details class="panel collapsible">`
+      + `<summary>`
+      +   `<span class="head-left">Co-changes with this ${infoBadge(tipCoupling)}</span>`
+      +   `<span class="head-right"><span>${cLabel}</span><svg class="disc" viewBox="0 0 16 16"><use href="#oc-chevron-right"/></svg></span>`
+      + `</summary>`
+      + `<div class="coupling">${rows}</div>`
+      + `</details>`
+    );
+  }
+
+  /* Risks & gotchas — actionable synthesis after the dependency panels above. */
+  if (Array.isArray(DATA.risks) && DATA.risks.length){
+    const cards = DATA.risks.map(riskCard).join('');
+    const tipRisks = "Things to know before editing this code — contracts that must hold, files that change in lockstep, and known gotchas. Each card surfaces one risk synthesized from the history above.";
+    bits.push(`<div class="panel"><h4><span class="head-left">Risks &amp; gotchas ${infoBadge(tipRisks)}</span></h4>${cards}</div>`);
+  }
+
+  if (bits.length){ g.innerHTML = bits.join(''); g.hidden = false; }
+
+  /* Decorate person mentions inside card/risk `.why` blocks (the at-a-glance area).
+     The main article is decorated outside this IIFE since it's set up earlier. */
+  document.querySelectorAll('#glance .why').forEach(el => decoratePeople(el, PEOPLE));
+
+  /* Syntax-highlight the snippets (and any code blocks in the prose) */
+  if (window.hljs){
+    document.querySelectorAll('pre code').forEach(el => {
+      try { hljs.highlightElement(el); } catch(e) { /* ignore unknown languages */ }
+    });
+  }
+})();
+
+/* Also decorate the main article (the markdown prose section). DATA may be null in
+   that case skip — there's no people lookup to apply. */
+if (DATA){
+  decoratePeople(document.getElementById('rendered'), PEOPLE);
+}
+
+/* ---------- vertical timeline (scales to any number of events) ---------- */
+function timelineVertical(events){
+  const rows = events.map(e => {
+    const cls = e.kind || 'context';
+    const icon = ocSpan(kindIcon(e.kind));
+    const rel = fmtRelative(e.date);
+    const dateChip = `<span class="tdate" title="${esc(rel)}">${fmtDate(e.date)}</span>`;
+    const label = e.url
+      ? `<a class="tlabel" href="${e.url}" target="_blank" rel="noopener">${icon}<span>${esc(e.label||'')}</span></a>`
+      : `<span class="tlabel nolink">${icon}<span>${esc(e.label||'')}</span></span>`;
+    return `<div class="tev"><span class="tdot ${cls}"></span>${dateChip}${label}</div>`;
+  }).join('');
+  return `<div class="timeline-v">${rows}</div>`;
+}
+
+/* ---------- (legacy) horizontal timeline — retained for backwards compat ---------- */
+function timelineSvg(events){
+  const W = 760, H = 116, padL = 20, padR = 20;
+  const dotY = 54, axisY = dotY;
+  const labelW = 188, labelH = 22;
+  const xs = events.map(e=>new Date(e.date).getTime());
+  const min = Math.min(...xs), max = Math.max(...xs);
+  const span = Math.max(max-min, 86400000);
+  const x = t => padL + (W-padL-padR) * (t-min) / span;
+  const colour = k => `var(--c-${k||'context'})`;
+  let s = `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  s += `<line class="axis" x1="${padL}" y1="${axisY}" x2="${W-padR}" y2="${axisY}" />`;
+  s += `<text class="tlabel" x="${padL}" y="${H-8}">${fmtDate(new Date(min).toISOString())}</text>`;
+  s += `<text class="tlabel" x="${W-padR}" y="${H-8}" text-anchor="end">${fmtDate(new Date(max).toISOString())}</text>`;
+  events.forEach((e, i) => {
+    const cx = x(new Date(e.date).getTime());
+    const above = i % 2 === 0;
+    const labelY = above ? (dotY - 6 - labelH) : (dotY + 6);
+    const connY1 = above ? labelY + labelH - 1 : dotY + 6;
+    const connY2 = above ? dotY - 6 : labelY + 1;
+    s += `<line x1="${cx}" x2="${cx}" y1="${connY1}" y2="${connY2}" stroke="${colour(e.kind)}" stroke-width="1" opacity=".55" />`;
+    s += `<circle cx="${cx}" cy="${dotY}" r="6" fill="${colour(e.kind)}" />`;
+    const lx = Math.max(padL, Math.min(W - padR - labelW, cx - labelW/2));
+    const icon = kindIcon(e.kind);
+    const inner = e.url
+      ? `<a class="tl-label" href="${e.url}" target="_blank" rel="noopener"><svg class="oc"><use href="#${icon}"/></svg><span>${esc(e.label||'')}</span></a>`
+      : `<span class="tl-label"><svg class="oc"><use href="#${icon}"/></svg><span>${esc(e.label||'')}</span></span>`;
+    s += `<foreignObject x="${lx}" y="${labelY}" width="${labelW}" height="${labelH}">`
+       +   `<div xmlns="http://www.w3.org/1999/xhtml" class="tl-wrap">${inner}</div>`
+       + `</foreignObject>`;
+  });
+  s += `</svg>`;
+  return s;
+}
+
+/* ---------- histogram ---------- */
+function histogramSvg(byMonth){
+  const W=760, H=130, padL=30, padR=14, padT=8, padB=24;
+  const months = Object.keys(byMonth).sort();
+  const filled = (function(){
+    const out=[]; if(!months.length) return out;
+    const [y,m] = months[0].split('-').map(Number);
+    let cy=y, cm=m;
+    const [yE,mE] = months[months.length-1].split('-').map(Number);
+    while (cy<yE || (cy===yE && cm<=mE)){
+      const k = `${cy}-${String(cm).padStart(2,'0')}`;
+      out.push([k, byMonth[k]||0]);
+      cm++; if(cm===13){cm=1;cy++;}
+    }
+    return out;
+  })();
+  const max = Math.max(...filled.map(f=>f[1]), 1);
+  const innerW = W-padL-padR, innerH = H-padT-padB;
+  const bw = innerW / filled.length * 0.78;
+  const gap = innerW / filled.length * 0.22;
+  let s = `<svg class="histogram" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">`;
+  s += `<line class="axis" x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" />`;
+  s += `<text class="tlabel" x="${padL-6}" y="${padT+10}" text-anchor="end">${max}</text>`;
+  s += `<text class="tlabel" x="${padL-6}" y="${H-padB+4}" text-anchor="end">0</text>`;
+  filled.forEach((row, i) => {
+    const [key, count] = row;
+    const xPos = padL + i*(bw+gap) + gap/2;
+    const h = (count/max) * innerH;
+    const y = H-padB - h;
+    s += `<rect class="bar" x="${xPos}" y="${y}" width="${bw}" height="${h}"><title>${key}: ${count}</title></rect>`;
+  });
+  if (filled.length){
+    s += `<text class="tlabel" x="${padL}" y="${H-6}">${filled[0][0]}</text>`;
+    s += `<text class="tlabel" x="${W-padR}" y="${H-6}" text-anchor="end">${filled[filled.length-1][0]}</text>`;
+  }
+  s += `</svg>`;
+  return s;
+}
+
+/* ---------- copy markdown / raw ---------- */
+const toast = m => { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1400); };
+document.getElementById('copyBtn').addEventListener('click', async ()=>{
+  try{ await navigator.clipboard.writeText(MARKDOWN); toast('Markdown copied'); }
+  catch(e){ const ta=document.getElementById('raw'); document.getElementById('rawWrap').open=true; ta.focus(); ta.select(); document.execCommand('copy'); toast('Selected — press ⌘C'); }
+});
+document.getElementById('rawBtn').addEventListener('click', ()=>{
+  const w = document.getElementById('rawWrap'); w.open = !w.open; if (w.open) w.scrollIntoView({behavior:'smooth'});
+});
+
+/* ---------- theme selector ---------- */
+const themeSel = document.getElementById('themeSel');
+function getTheme(){
+  try { return localStorage.getItem('why-theme') || 'default'; } catch(e) { return 'default'; }
+}
+/* Sync the dropdown's value with the saved theme on load. */
+if (themeSel) themeSel.value = getTheme();
+themeSel && themeSel.addEventListener('change', () => {
+  const next = themeSel.value;
+  if (next === 'default') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('why-theme', next); } catch(e) {}
+});
+</script>
+</body>
+</html>

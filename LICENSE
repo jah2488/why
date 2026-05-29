@@ -1,0 +1,35 @@
+MIT License
+
+Copyright (c) 2026 Justin Herrick (jah2488)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+---
+
+This skill bundles the following third-party libraries; each retains its own
+license, preserved in the asset file's own header:
+
+- marked v12.0.2 (MIT) — https://github.com/markedjs/marked
+- highlight.js v11.9.0 (BSD-3-Clause) — https://github.com/highlightjs/highlight.js
+- Primer Octicons (MIT) — https://github.com/primer/octicons
+  (Individual SVG paths are inlined into skills/why/assets/report_template.html.)
+
+The skill composes Gravatar URLs (https://www.gravatar.com/avatar/<md5>) from
+git author emails; Gravatar images themselves are served by gravatar.com and
+are not bundled.
