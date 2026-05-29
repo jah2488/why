@@ -489,6 +489,40 @@ const MARKDOWN = __MARKDOWN_JSON__;
 const DATA = __DATA_JSON__;          // may be null
 const GENERATED = "__GENERATED__";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Avatar resolution — ONE shared primitive used everywhere an avatar appears:
+   significant-change cards, discussion cards, the at-a-glance head, the
+   Frequent-authors panel, and inline prose person-chips. Resolution order:
+     1. an explicit avatar_url the sidecar gave for that entry,
+     2. the avatar already known for that person in the people index — so a
+        card/discussion author who is also a frequent author transparently
+        reuses find_authors' gravatar, with zero per-card plumbing,
+     3. a GitHub avatar derived from a handle-shaped reference.
+   Every rendered <img> carries an onerror that degrades to an empty circle,
+   so a 404 from step 3 shows a blank avatar, never a broken-image icon. That
+   safety net is why deriving github.com/<handle>.png is safe here even though
+   a bare guess was previously avoided: a miss is now invisible, while the
+   common case (author IS a real handle) renders a real avatar instead of the
+   empty circle that used to be the default for every card. */
+const GH_HANDLE_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]){0,38}$/;
+function githubHandle(ref){
+  const s = ref == null ? '' : String(ref).trim();
+  return GH_HANDLE_RE.test(s) ? s : null;
+}
+function githubAvatarFor(ref){
+  const h = githubHandle(ref);
+  return h ? `https://github.com/${encodeURIComponent(h)}.png?size=144` : null;
+}
+/* Single identity index, built once from every person-bearing field in DATA
+   (see buildPeopleLookup). All avatar/chip rendering reads from this. */
+const PEOPLE = buildPeopleLookup(DATA || {});
+function resolveAvatarUrl(ref, explicitUrl){
+  if (explicitUrl) return explicitUrl;
+  const key = ref == null ? '' : String(ref).trim().toLowerCase();
+  if (key && PEOPLE[key] && PEOPLE[key].avatar) return PEOPLE[key].avatar;
+  return githubAvatarFor(ref);
+}
+
 /* ---------- helpers ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function fmtDate(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?s:d.toISOString().slice(0,10); }
@@ -562,10 +596,12 @@ function refLink(icon, text, href){
   return href ? `<a class="ref" href="${href}" target="_blank">${inner}</a>` : `<span class="ref" style="color:var(--fg)">${inner}</span>`;
 }
 function avatarBlock(author, avatarUrl){
-  // Use the precomputed gravatar URL the sidecar provides. The old github.com/<user>.png
-  // guess often 404'd silently — drop it; an empty circle reads better than a broken image.
-  if (!avatarUrl) return `<span class="avatar-empty" aria-hidden="true"></span>`;
-  return `<img class="avatar" src="${avatarUrl}" alt="${esc(author||'')}" `
+  // Resolve through the shared primitive (explicit url → people index → derived
+  // github avatar). The onerror degrades a missed derive to an empty circle, so
+  // there are no broken images and cards no longer default to a blank avatar.
+  const src = resolveAvatarUrl(author, avatarUrl);
+  if (!src) return `<span class="avatar-empty" aria-hidden="true"></span>`;
+  return `<img class="avatar" src="${src}" alt="${esc(author||'')}" `
        + `onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-empty'}))">`;
 }
 function commitHead(o, opts){
@@ -868,27 +904,42 @@ function gapBetween(d1, d2){
      with avatar+link chips. Only decorates text nodes; skips A/CODE/PRE/SCRIPT/SVG
      and anything already chip-styled. ---------- */
 function buildPeopleLookup(data){
+  data = data || {};
   const people = {};
-  function add(displayName, avatarUrl, handle){
-    if (!displayName) return;
-    const key = String(displayName).trim().toLowerCase();
-    if (!key || people[key]) return;
-    const ghHandle = handle || displayName;
-    const url = (typeof ghHandle === 'string' && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]){0,38}$/.test(ghHandle))
-              ? `https://github.com/${encodeURIComponent(ghHandle)}`
-              : null;
-    people[key] = {name: String(displayName), avatar: avatarUrl || null, url};
+  // Register one person record under every alias we know for them — display
+  // name, github handle, and email — so a later lookup by ANY of those keys
+  // (a card's login, a prose mention of their name) resolves to the same
+  // person. First writer wins per key, and frequent_authors is processed
+  // first, so find_authors' gravatar is the authoritative avatar for someone
+  // who appears in multiple sections.
+  function add(displayName, avatarUrl, handle, email){
+    const ghHandle = githubHandle(handle) || githubHandle(displayName);
+    const record = {
+      name: String(displayName || handle || email || ''),
+      avatar: avatarUrl || githubAvatarFor(ghHandle),
+      url: ghHandle ? `https://github.com/${encodeURIComponent(ghHandle)}` : null,
+    };
+    if (!record.name && !ghHandle && !email) return;
+    for (const alias of [displayName, handle, email]){
+      if (alias == null) continue;
+      const key = String(alias).trim().toLowerCase();
+      if (key && !people[key]) people[key] = record;
+    }
   }
-  for (const a of (data.frequent_authors || [])) add(a.name, a.avatar_url, a.github_handle);
+  for (const a of (data.frequent_authors || [])) add(a.name, a.avatar_url, a.github_handle, a.email);
   if (data.origin) add(data.origin.author, data.origin.avatar_url, data.origin.author);
   if (data.recent) add(data.recent.author, data.recent.avatar_url, data.recent.author);
   for (const c of (data.significant_changes || [])) add(c.author, c.avatar_url, c.author);
+  for (const d of (data.discussions || [])) add(d.author, d.avatar_url, d.author);
   return people;
 }
 
 function renderPersonChip(p){
-  const avatar = p.avatar
-    ? `<img class="person-avatar" src="${p.avatar}" alt="${esc(p.name)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'person-avatar-empty'}))">`
+  // Same resolver as the card/panel avatars, so a prose mention and the card it
+  // refers to always show the identical avatar.
+  const src = resolveAvatarUrl(p.name, p.avatar);
+  const avatar = src
+    ? `<img class="person-avatar" src="${src}" alt="${esc(p.name)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'person-avatar-empty'}))">`
     : `<span class="person-avatar-empty" aria-hidden="true"></span>`;
   const nameStr = esc(p.name);
   const link = p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${nameStr}</a>` : `<span>${nameStr}</span>`;
@@ -1061,8 +1112,7 @@ function decoratePeople(root, people){
 
   /* Decorate person mentions inside card/risk `.why` blocks (the at-a-glance area).
      The main article is decorated outside this IIFE since it's set up earlier. */
-  const people = buildPeopleLookup(DATA);
-  document.querySelectorAll('#glance .why').forEach(el => decoratePeople(el, people));
+  document.querySelectorAll('#glance .why').forEach(el => decoratePeople(el, PEOPLE));
 
   /* Syntax-highlight the snippets (and any code blocks in the prose) */
   if (window.hljs){
@@ -1075,7 +1125,7 @@ function decoratePeople(root, people){
 /* Also decorate the main article (the markdown prose section). DATA may be null in
    that case skip — there's no people lookup to apply. */
 if (DATA){
-  decoratePeople(document.getElementById('rendered'), buildPeopleLookup(DATA));
+  decoratePeople(document.getElementById('rendered'), PEOPLE);
 }
 
 /* ---------- vertical timeline (scales to any number of events) ---------- */
