@@ -522,6 +522,20 @@ function resolveAvatarUrl(ref, explicitUrl){
   if (key && PEOPLE[key] && PEOPLE[key].avatar) return PEOPLE[key].avatar;
   return githubAvatarFor(ref);
 }
+/* Gate a resolved avatar URL before it goes into an <img src>. Avatar data
+   ultimately derives from git author names/emails and PR content, so an
+   explicit avatar_url could in principle carry a javascript:/quote payload.
+   Parse it, allow only http/https, and return a normalized string (callers
+   still esc() it for the attribute). Anything else → null → empty circle. */
+function safeAvatarSrc(url){
+  if (!url) return null;
+  try {
+    const u = new URL(String(url).trim(), document.baseURI);
+    return (u.protocol === 'https:' || u.protocol === 'http:') ? u.href : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 /* ---------- helpers ---------- */
 function esc(s){return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -599,9 +613,9 @@ function avatarBlock(author, avatarUrl){
   // Resolve through the shared primitive (explicit url → people index → derived
   // github avatar). The onerror degrades a missed derive to an empty circle, so
   // there are no broken images and cards no longer default to a blank avatar.
-  const src = resolveAvatarUrl(author, avatarUrl);
+  const src = safeAvatarSrc(resolveAvatarUrl(author, avatarUrl));
   if (!src) return `<span class="avatar-empty" aria-hidden="true"></span>`;
-  return `<img class="avatar" src="${src}" alt="${esc(author||'')}" `
+  return `<img class="avatar" src="${esc(src)}" alt="${esc(author||'')}" `
        + `onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'avatar-empty'}))">`;
 }
 function commitHead(o, opts){
@@ -923,7 +937,20 @@ function buildPeopleLookup(data){
     for (const alias of [displayName, handle, email]){
       if (alias == null) continue;
       const key = String(alias).trim().toLowerCase();
-      if (key && !people[key]) people[key] = record;
+      if (!key) continue;
+      const existing = people[key];
+      if (!existing) {
+        people[key] = record;
+      } else {
+        // Enrich-on-collision: a later, richer sighting of the same person
+        // fills fields the first one left empty, but never overwrites an
+        // existing value. So frequent_authors' gravatar still wins, while a
+        // sparse early entry (e.g. a non-handle origin author with no avatar)
+        // can still gain an avatar/url/name from a later entry.
+        if (!existing.avatar && record.avatar) existing.avatar = record.avatar;
+        if (!existing.url && record.url) existing.url = record.url;
+        if (!existing.name && record.name) existing.name = record.name;
+      }
     }
   }
   for (const a of (data.frequent_authors || [])) add(a.name, a.avatar_url, a.github_handle, a.email);
@@ -937,9 +964,9 @@ function buildPeopleLookup(data){
 function renderPersonChip(p){
   // Same resolver as the card/panel avatars, so a prose mention and the card it
   // refers to always show the identical avatar.
-  const src = resolveAvatarUrl(p.name, p.avatar);
+  const src = safeAvatarSrc(resolveAvatarUrl(p.name, p.avatar));
   const avatar = src
-    ? `<img class="person-avatar" src="${src}" alt="${esc(p.name)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'person-avatar-empty'}))">`
+    ? `<img class="person-avatar" src="${esc(src)}" alt="${esc(p.name)}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'person-avatar-empty'}))">`
     : `<span class="person-avatar-empty" aria-hidden="true"></span>`;
   const nameStr = esc(p.name);
   const link = p.url ? `<a href="${p.url}" target="_blank" rel="noopener">${nameStr}</a>` : `<span>${nameStr}</span>`;
